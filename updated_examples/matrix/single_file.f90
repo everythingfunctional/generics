@@ -21,7 +21,7 @@ module semigroup_m
     end requirement
 
     requirement extended_semigroup(T, combine, sconcat, stimes)
-        requires semigroup(T, combine)
+        require :: semigroup(T, combine)
         interface
             pure function sconcat(list) result(combined)
                 type(T), intent(in) :: list(:) !! Must contain at least one element
@@ -36,13 +36,17 @@ module semigroup_m
     end requirement
 
     template derive_extended_semigroup(T, combine)
-        requires semigroup(T, combine)
+        require :: semigroup(T, combine)
 
         private
         public :: sconcat, stimes
 
-        generic :: sconcat => sconcat_
-        generic :: stimes => stimes_
+        interface sconcat
+            procedure sconcat_
+        end interface
+        interface stimes
+            procedure stimes_
+        end interface
     contains
         pure function sconcat_(list) result(combined)
             type(T), intent(in) :: list(:)
@@ -86,7 +90,7 @@ module monoid_m
     public :: monoid, extended_monoid, derive_extended_monoid
 
     requirement monoid(T, combine, empty)
-        requires semigroup(T, combine)
+        require :: semigroup(T, combine)
         interface
             pure function empty()
                 type(T) :: empty
@@ -95,8 +99,8 @@ module monoid_m
     end requirement
 
     requirement extended_monoid(T, combine, sconcat, stimes, empty, mconcat)
-        requires extended_semigroup(T, combine, sconcat, stimes)
-        requires monoid(T, combine, empty)
+        require :: extended_semigroup(T, combine, sconcat, stimes)
+        require :: monoid(T, combine, empty)
         interface
             pure function mconcat(list) result(combined)
                 type(T), intent(in) :: list(:)
@@ -106,14 +110,16 @@ module monoid_m
     end requirement
 
     template derive_extended_monoid(T, combine, empty)
-        requires monoid(T, combine, empty)
+        require :: monoid(T, combine, empty)
 
         private
         public :: stimes, mconcat
 
         instantiate derive_extended_semigroup(T, combine), only: stimes
 
-        generic :: mconcat => mconcat_
+        interface mconcat
+            procedure mconcat_
+        end interface
     contains
         pure function mconcat_(list) result(combined)
             type(T), intent(in) :: list(:)
@@ -143,8 +149,8 @@ module semiring_m
     public :: semiring
 
     requirement semiring(T, plus, zero, mult, one)
-        requires monoid(T, plus, zero)
-        requires monoid(T, mult, one)
+        require :: monoid(T, plus, zero)
+        require :: monoid(T, mult, one)
     end requirement
 end module
 
@@ -162,7 +168,7 @@ module unit_ring_m
             derive_unit_ring_from_negate
 
     requirement unit_ring_only_minus(T, plus, zero, mult, one, minus)
-        requires semiring(T, plus, zero, mult, one)
+        require :: semiring(T, plus, zero, mult, one)
         interface
             elemental function minus(x, y) result(difference)
                 type(T), intent(in) :: x, y
@@ -172,7 +178,7 @@ module unit_ring_m
     end requirement
 
     requirement unit_ring_only_negate(T, plus, zero, mult, one, negate)
-        requires semiring(T, plus, zero, mult, one)
+        require :: semiring(T, plus, zero, mult, one)
         interface
             elemental function negate(x) result(negated)
                 type(T), intent(in) :: x
@@ -182,17 +188,19 @@ module unit_ring_m
     end requirement
 
     requirement unit_ring(T, plus, zero, mult, one, minus, negate)
-        requires unit_ring_only_minus(T, plus, zero, mult, one, minus)
-        requires unit_ring_only_negate(T, plus, zero, mult, one, negate)
+        require :: unit_ring_only_minus(T, plus, zero, mult, one, minus)
+        require :: unit_ring_only_negate(T, plus, zero, mult, one, negate)
     end requirement
 
     template derive_unit_ring_from_minus(T, plus, zero, mult, one, minus)
-        requires unit_ring_only_minus(T, plus, zero, mult, one, minus)
+        require :: unit_ring_only_minus(T, plus, zero, mult, one, minus)
 
         private
         public :: negate
 
-        generic :: negate => negate_
+        interface negate
+            procedure negate_
+        end interface
     contains
         elemental function negate_(x) result(negated)
             type(T), intent(in) :: x
@@ -203,12 +211,14 @@ module unit_ring_m
     end template
 
     template derive_unit_ring_from_negate(T, plus, zero, mult, one, negate)
-        requires unit_ring_only_negate(T, plus, zero, mult, one, negate)
+        require :: unit_ring_only_negate(T, plus, zero, mult, one, negate)
 
         private
         public :: minus
 
-        generic :: minus => minus_
+        interface minus
+            procedure minus_
+        end interface
     contains
         elemental function minus_(x, y) result(difference)
             type(T), intent(in) :: x, y
@@ -233,7 +243,7 @@ module field_m
             derive_field_from_inverse
 
     requirement field_only_division(T, plus, zero, mult, one, minus, negate, divide)
-        requires unit_ring(T, plus, zero, mult, one, minus, negate)
+        require :: unit_ring(T, plus, zero, mult, one, minus, negate)
         interface
             elemental function divide(x, y) result(quotient)
                 type(T), intent(in) :: x, y
@@ -243,7 +253,7 @@ module field_m
     end requirement
 
     requirement field_only_inverse(T, plus, zero, mult, one, minus, negate, invert)
-        requires unit_ring(T, plus, zero, mult, one, minus, negate)
+        require :: unit_ring(T, plus, zero, mult, one, minus, negate)
         interface
             elemental function invert(x) result(inverse)
                 type(T), intent(in) :: x
@@ -253,17 +263,19 @@ module field_m
     end requirement
 
     requirement field(T, plus, zero, mult, one, minus, negate, divide, invert)
-        requires field_only_division(T, plus, zero, mult, one, minus, negate, divide)
-        requires field_only_inverse(T, plus, zero, mult, one, minus, negate, invert)
+        require :: field_only_division(T, plus, zero, mult, one, minus, negate, divide)
+        require :: field_only_inverse(T, plus, zero, mult, one, minus, negate, invert)
     end requirement
 
     template derive_field_from_division(T, plus, zero, mult, one, minus, negate, divide)
-        requires field_only_division(T, plus, zero, mult, one, minus, negate, divide)
+        require :: field_only_division(T, plus, zero, mult, one, minus, negate, divide)
 
         private
         public :: invert
 
-        generic :: invert => invert_
+        interface invert
+            procedure invert_
+        end interface
     contains
         elemental function invert_(x) result(inverse)
             type(T), intent(in) :: x
@@ -274,12 +286,14 @@ module field_m
     end template
 
     template derive_field_from_inverse(T, plus, zero, mult, one, minus, negate, invert)
-        requires field_only_inverse(T, plus, zero, mult, one, minus, negate, invert)
+        require :: field_only_inverse(T, plus, zero, mult, one, minus, negate, invert)
 
         private
         public :: divide
 
-        generic :: divide => divide_
+        interface divide
+            procedure divide_
+        end interface
     contains
         elemental function divide_(x, y) result(quotient)
             type(T), intent(in) :: x, y
@@ -300,7 +314,7 @@ module matrix_m
     public :: matrix_tmpl
 
     template matrix_tmpl(T, plus_t, zero_t, times_t, one_t, n)
-        requires semiring(T, plus_t, zero_t, times_t, one_t)
+        require :: semiring(T, plus_t, zero_t, times_t, one_t)
 
         integer, constant :: n
 
@@ -321,7 +335,7 @@ module matrix_m
         generic :: operator(*) => times_matrix
 
         template matrix_subtraction_tmpl(minus_t)
-            requires unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
+            require :: unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
 
             private
             public :: operator(-), gaussian_solver_tmpl
@@ -330,7 +344,7 @@ module matrix_m
 
             template gaussian_solver_tmpl(div_t)
                 instantiate derive_unit_ring_from_minus(T, plus_t, zero_t, times_t, one_t, minus_t), only: negate
-                requires field_only_division(T, plus_t, zero_t, times_t, one_t, minus_t, negate, div_t)
+                require :: field_only_division(T, plus_t, zero_t, times_t, one_t, minus_t, negate, div_t)
 
                 private
                 public :: operator(/)
