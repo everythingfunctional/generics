@@ -316,7 +316,7 @@ module matrix_m
     template matrix_tmpl(T, plus_t, zero_t, times_t, one_t, n)
         require :: semiring(T, plus_t, zero_t, times_t, one_t)
 
-        integer, constant :: n
+        integer :: n
 
         private
         public :: &
@@ -331,8 +331,12 @@ module matrix_m
             type(T) :: elements(n, n)
         end type
 
-        generic :: operator(+) => plus_matrix
-        generic :: operator(*) => times_matrix
+        interface operator(+)
+            procedure plus_matrix
+        end interface
+        interface operator(*)
+            procedure times_matrix
+        end interface
 
         template matrix_subtraction_tmpl(minus_t)
             require :: unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
@@ -340,7 +344,9 @@ module matrix_m
             private
             public :: operator(-), gaussian_solver_tmpl
 
-            generic :: operator(-) => minus_matrix
+            interface operator(-)
+                procedure minus_matrix
+            end interface
 
             template gaussian_solver_tmpl(div_t)
                 instantiate derive_unit_ring_from_minus(T, plus_t, zero_t, times_t, one_t, minus_t), only: negate
@@ -349,7 +355,9 @@ module matrix_m
                 private
                 public :: operator(/)
 
-                generic :: operator(/) => div_matrix
+                interface operator(/)
+                    procedure div_matrix
+                end interface
             contains
                 elemental function div_matrix(x, y) result(quotient)
                     type(matrix), intent(in) :: x, y
