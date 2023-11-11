@@ -311,12 +311,15 @@ module matrix_m
 
     implicit none
     private
-    public :: matrix_tmpl
+    public :: &
+            use_real_matrix, &
+            use_complex_matrix, &
+            use_integer_matrix, &
+            use_tropical_semiring_matrix, &
+            use_block_matrix
 
-    template matrix_tmpl(T, plus_t, zero_t, times_t, one_t, n)
+    template matrix_tmpl(T, plus_t, zero_t, times_t, one_t)
         require :: semiring(T, plus_t, zero_t, times_t, one_t)
-
-        integer :: n
 
         private
         public :: &
@@ -324,11 +327,10 @@ module matrix_m
                 operator(+), &
                 operator(*), &
                 zero, &
-                one, &
-                matrix_subtraction_tmpl
+                one
 
         type :: matrix
-            type(T) :: elements(n, n)
+            type(T) :: elements(5, 5)
         end type
 
         interface operator(+)
@@ -337,87 +339,16 @@ module matrix_m
         interface operator(*)
             procedure times_matrix
         end interface
-
-        template matrix_subtraction_tmpl(minus_t)
-            require :: unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
-
-            private
-            public :: operator(-), gaussian_solver_tmpl
-
-            interface operator(-)
-                procedure minus_matrix
-            end interface
-
-            template gaussian_solver_tmpl(div_t)
-                instantiate derive_unit_ring_from_minus(T, plus_t, zero_t, times_t, one_t, minus_t), only: negate
-                require :: field_only_division(T, plus_t, zero_t, times_t, one_t, minus_t, negate, div_t)
-
-                private
-                public :: operator(/)
-
-                interface operator(/)
-                    procedure div_matrix
-                end interface
-            contains
-                elemental function div_matrix(x, y) result(quotient)
-                    type(matrix), intent(in) :: x, y
-                    type(matrix) :: quotient
-
-                    quotient = back_substitute(row_eschelon(x), y)
-                end function
-
-                pure function row_eschelon(x) result(reduced)
-                    type(matrix), intent(in) :: x
-                    type(matrix) :: reduced
-
-                    integer :: i, ii, j
-                    type(T) :: r
-
-                    reduced = x
-
-                    do i = 1, n
-                        ! Assume pivot m(i,i) is not zero
-                        do ii = i+1, n
-                            r = div_t(reduced%elements(i,i), reduced%elements(ii,i))
-                            reduced%elements(ii, i) = zero_t()
-                            do j = i+1, n
-                                reduced%elements(ii, j) = minus_t(reduced%elements(ii, j), times_t(reduced%elements(i, j), r))
-                            end do
-                        end do
-                    end do
-                end function
-
-                pure function back_substitute(x, y) result(solved)
-                    type(matrix), intent(in) :: x, y
-                    type(matrix) :: solved
-
-                    integer :: i, j
-                    type(T) :: tmp(n)
-
-                    solved = y
-                    do i = n, 1, -1
-                        tmp = zero_t
-                        do j = i+1, n
-                            tmp = plus(tmp, times(x%elements(i,j), solved%elements(:,j)))
-                        end do
-                        solved%elements(:,i) = div_t(minus(solved%elements(:, i), tmp), x%elements(i,i))
-                    end do
-                end function
-            end template
-        contains
-            elemental function minus_matrix(x, y) result(difference)
-                type(matrix), intent(in) :: x, y
-                type(matrix) :: difference
-
-                difference%elements = minus_t(x%elements, y%elements)
-            end function
-        end template
     contains
         elemental function plus_matrix(x, y) result(combined)
             type(matrix), intent(in) :: x, y
             type(matrix) :: combined
 
-            combined%elements = plus_t(x%elements, y%elements)
+            do j = 1, size(combined%elements, dim=2)
+                do i = 1, size(combined%elements, dim=1)
+                    combined%elements = plus_t(x%elements(i,j), y%elements(i, j))
+                end do
+            end do
         end function
 
         pure function zero()
@@ -433,8 +364,10 @@ module matrix_m
             instantiate derive_extended_monoid(T, plus_t, zero_t), only: sum => mconcat
             integer :: i, j
 
-            do concurrent (i = 1:n, j = 1:n)
-                combined%elements(i, j) = sum(times(x%elements(i,:), y%elements(:,j)))
+            do j = 1, size(combined%elements, dim=2)
+                do i = 1, size(combined%elements, dim=1)
+                    combined%elements(i, j) = sum(times(x%elements(i,:), y%elements(:,j)))
+                end do
             end do
         end function
 
@@ -444,24 +377,112 @@ module matrix_m
             integer :: i
 
             one%elements = zero_t()
-            do concurrent (i = 1:n)
+            do i = 1, size(one%elements, dim=1)
                 one%elements(i, i) = one_t()
             end do
         end function
     end template
-end module
 
-module real_matrix_m
-    use matrix_m, only: matrix_tmpl
+    template matrix_with_subtraction_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t)
+        require :: unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
+        instantiate matrix_tmpl(T, plus_t, zero_t, times_t, one_t), only: &
+                matrix, &
+                operator(+), &
+                operator(*), &
+                zero, &
+                one
 
-    implicit none
+        private
+        public :: &
+                matrix, &
+                operator(+), &
+                operator(*), &
+                zero, &
+                one, &
+                operator(-)
 
-    integer, parameter :: n = 10
+        interface operator(-)
+            procedure minus_matrix
+        end interface
+    contains
+        elemental function minus_matrix(x, y) result(difference)
+            type(matrix), intent(in) :: x, y
+            type(matrix) :: difference
 
-    instantiate matrix_tmpl(real, operator(+), real_zero, operator(*), real_one, n), only: &
-            matrix, operator(+), zero, operator(*), one, matrix_subtraction_tmpl
-    instantiate matrix_subtraction_tmpl(operator(-)), only: operator(-), gaussian_solver_tmpl
-    instantiate gaussian_solver_tmpl(operator(/)), only: operator(/)
+            difference%elements = minus_t(x%elements, y%elements)
+        end function
+    end template
+
+    template matrix_with_division_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t, div_t)
+        instantiate derive_unit_ring_from_minus(T, plus_t, zero_t, times_t, one_t, minus_t), only: negate
+        require :: field_only_division(T, plus_t, zero_t, times_t, one_t, minus_t, negate, div_t)
+        instantiate matrix_with_subtraction_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t), only: &
+                matrix, &
+                operator(+), &
+                operator(*), &
+                zero, &
+                one, &
+                operator(-)
+
+        private
+        public :: &
+                matrix, &
+                operator(+), &
+                operator(*), &
+                zero, &
+                one, &
+                operator(-), &
+                operator(/)
+
+        interface operator(/)
+            procedure div_matrix
+        end interface
+    contains
+        elemental function div_matrix(x, y) result(quotient)
+            type(matrix), intent(in) :: x, y
+            type(matrix) :: quotient
+
+            quotient = back_substitute(row_eschelon(x), y)
+        end function
+
+        pure function row_eschelon(x) result(reduced)
+            type(matrix), intent(in) :: x
+            type(matrix) :: reduced
+
+            integer :: i, ii, j
+            type(T) :: r
+
+            reduced = x
+
+            do i = 1, n
+                ! Assume pivot m(i,i) is not zero
+                do ii = i+1, n
+                    r = div_t(reduced%elements(i,i), reduced%elements(ii,i))
+                    reduced%elements(ii, i) = zero_t()
+                    do j = i+1, n
+                        reduced%elements(ii, j) = minus_t(reduced%elements(ii, j), times_t(reduced%elements(i, j), r))
+                    end do
+                end do
+            end do
+        end function
+
+        pure function back_substitute(x, y) result(solved)
+            type(matrix), intent(in) :: x, y
+            type(matrix) :: solved
+
+            integer :: i, j
+            type(T) :: tmp(n)
+
+            solved = y
+            do i = n, 1, -1
+                tmp = zero_t
+                do j = i+1, n
+                    tmp = plus(tmp, times(x%elements(i,j), solved%elements(:,j)))
+                end do
+                solved%elements(:,i) = div_t(minus(solved%elements(:, i), tmp), x%elements(i,i))
+            end do
+        end function
+    end template
 contains
     pure function real_zero()
         real :: real_zero
@@ -474,20 +495,7 @@ contains
 
         real_one = 1.
     end function
-end module
 
-module complex_matrix_m
-    use matrix_m, only: matrix_tmpl
-
-    implicit none
-
-    integer, parameter :: n = 10
-
-    instantiate matrix_tmpl(complex, operator(+), complex_zero, operator(*), complex_one, n), only: &
-            matrix, operator(+), zero, operator(*), one, matrix_subtraction_tmpl
-    instantiate matrix_subtraction_tmpl(operator(-)), only: operator(-), gaussian_solver_tmpl
-    instantiate gaussian_solver_tmpl(operator(/)), only: operator(/)
-contains
     pure function complex_zero()
         complex :: complex_zero
 
@@ -499,20 +507,7 @@ contains
 
         complex_one = 1.
     end function
-end module
 
-module integer_matrix_m
-    use matrix_m, only: matrix_tmpl
-
-    implicit none
-
-    integer, parameter :: n = 10
-
-    instantiate matrix_tmpl(integer, operator(+), integer_zero, operator(*), integer_one, n), only: &
-            matrix, operator(+), zero, operator(*), one, matrix_subtraction_tmpl
-    instantiate matrix_subtraction_tmpl(operator(-)), only: operator(-)
-    ! Note, gaussian_solver wouldn't work correctly for integer matrix
-contains
     pure function integer_zero()
         integer :: integer_zero
 
@@ -524,19 +519,7 @@ contains
 
         integer_one = 1
     end function
-end module
 
-module tropical_semiring_m
-    !! This is a useful representation for graphs for certain algorithms.
-    use matrix_m, only: matrix_tmpl
-
-    implicit none
-
-    integer, parameter :: n = 10
-
-    instantiate matrix_tmpl(real, min, real_inf, operator(+), real_zero, n), only: &
-            matrix, operator(+), zero, operator(*)
-contains
     pure function real_inf()
         use ieee_arithmetic, only: ieee_value, ieee_positive_inf
 
@@ -545,44 +528,109 @@ contains
         real_inf = ieee_value(real_inf, ieee_positive_inf)
     end function
 
-    pure function real_zero()
-        real :: real_zero
+    subroutine use_real_matrix
+        instantiate matrix_with_division_tmpl( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-), operator(/)), only: &
+                matrix, operator(+), zero, operator(*), one, operator(-), operator(/)
 
-        real_zero = 0.
-    end function
-end module
+        type(matrix) :: m
+        integer :: i, j
 
-module block_matrix_m
-    use matrix_m, only: matrix_tmpl
-    use real_matrix_m, only: &
-            block_ => matrix, &
-            operator(+), &
-            zero_b => zero, &
-            operator(*), &
-            one_b => one, &
-            operator(-), &
-            operator(/)
+        do j = 1, size(m%elements, dim=2)
+            do i = 1, size(m%elements, dim=1)
+                m%elements(i, j) = (j-1) * size(m%elements, dim=1) + i
+            end do
+        end do
+    end subroutine
 
-    implicit none
+    subroutine use_complex_matrix
+        instantiate matrix_with_division_tmpl( &
+                complex, operator(+), complex_zero, operator(*), complex_one, operator(-), operator(/)), only: &
+                matrix, operator(+), zero, operator(*), one, operator(-), operator(/)
 
-    instantiate matrix_tmpl(block_, operator(+), zero_b, operator(*), one_b, 5), only: &
-            matrix, operator(+), zero, operator(*), one, matrix_subtraction_tmpl
-    instantiate matrix_subtraction_tmpl(operator(-)), only: operator(-), gaussian_solver_tmpl
-    instantiate gaussian_solver_tmpl(operator(/)), only: operator(/)
+        type(matrix) :: m
+        integer :: i, j
+
+        do j = 1, size(m%elements, dim=2)
+            do i = 1, size(m%elements, dim=1)
+                m%elements(i, j)%re = j
+                m%elements(i, j)%im = i
+            end do
+        end do
+    end subroutine
+
+    subroutine use_integer_matrix
+        ! Note, gaussian_solver wouldn't work correctly for integer matrix
+        instantiate matrix_with_subtraction_tmpl( &
+                integer, operator(+), integer_zero, operator(*), integer_one, operator(-)), only: &
+                matrix, operator(+), zero, operator(*), one, operator(-)
+
+        type(matrix) :: m
+        integer :: i, j
+
+        do j = 1, size(m%elements, dim=2)
+            do i = 1, size(m%elements, dim=1)
+                m%elements(i, j) = (j-1) * size(m%elements, dim=1) + i
+            end do
+        end do
+    end subroutine
+
+    subroutine use_tropical_semiring_matrix
+        ! This is a useful representation for graphs for certain algorithms.
+        instantiate matrix_tmpl(real, min, real_inf, operator(+), real_zero), only: &
+                matrix, operator(+), zero, operator(*)
+
+        type(matrix) :: m
+        integer :: i, j
+
+        do j = 1, size(m%elements, dim=2)
+            do i = 1, size(m%elements, dim=1)
+                m%elements(i, j) = (j-1) * size(m%elements, dim=1) + i
+            end do
+        end do
+    end subroutine
+
+    subroutine use_block_matrix
+        instantiate matrix_with_division_tmpl( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-), operator(/)), only: &
+                real_matrix => matrix, operator(+), real_matrix_zero => zero, operator(*), real_matrix_one => one, operator(-), operator(/)
+        ! We can make a block matrix with no extra code
+        instantiate matrix_with_division_tmpl( &
+                real_matrix, operator(+), real_matrix_zero, operator(*), real_matrix_one, operator(-), operator(/)), only: &
+                matrix, operator(+), zero, operator(*), one, operator(-), operator(/)
+
+        type(matrix) :: m
+        integer :: i, ii, j, jj
+
+        do j = 1, size(m%elements, dim=2)
+            do i = 1, size(m%elements, dim=1)
+                do jj = 1, size(m%elements(i, j)%elements, dim=2)
+                    do ii = 1, size(m%elements(i,j)%elements, dim=1)
+                        m%elements(i,j)%elements(ii,jj) = &
+                                (j-1) * size(m%elements, dim=1) * size(m%elements(i,j)%elements) & ! whole blocks above this row
+                                + (jj-1) * size(m%elements, dim=1) * size(m%elements(i,j)%elements, dim=1) & ! rows above this row
+                                + (i-1) * size(m%elements(i,j)%elements, dim=1) & ! elements to the left in other blocks
+                                + ii ! elements to the left in this block
+                    end do
+                end do
+            end do
+        end do
+    end subroutine
 end module
 
 program use_it
-    use block_matrix_m
+    use block_matrix_m, only: &
+            use_real_matrix, &
+            use_complex_matrix, &
+            use_integer_matrix, &
+            use_tropical_semiring_matrix, &
+            use_block_matrix
     implicit none
 
-    type(matrix) :: m
-    integer :: i, j
-
-    do j = 1, size(m%elements, dim=2)
-        do i = 1, size(m%elements, dim=1)
-            call random_number(m%elements(i,j)%elements)
-        end do
-    end do
-    print *, m
+    call use_real_matrix
+    call use_complex_matrix
+    call use_integer_matrix
+    call use_tropical_semiring_matrix
+    call use_block_matrix
 end program
 
