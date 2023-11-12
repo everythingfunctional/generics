@@ -223,12 +223,13 @@ module matrix_example
 
     template matrix_tmpl(T, plus_t, zero_t, times_t, one_t)
         require :: semiring(T, plus_t, zero_t, times_t, one_t)
+        instantiate derive_extended_monoid(T, plus_t, zero_t), only: sum => mconcat
 
         type :: matrix
             type(T) :: elements(5, 5)
         end type
     contains
-        elemental function plus_matrix(x, y) result(combined)
+        elemental function matrix_plus(x, y) result(combined)
             type(matrix), intent(in) :: x, y
             type(matrix) :: combined
 
@@ -236,7 +237,7 @@ module matrix_example
 
             do j = 1, size(combined%elements, dim=2)
                 do i = 1, size(combined%elements, dim=1)
-                    combined%elements = plus_t(x%elements(i,j), y%elements(i, j))
+                    combined%elements(i,j) = plus_t(x%elements(i,j), y%elements(i, j))
                 end do
             end do
         end function
@@ -253,11 +254,10 @@ module matrix_example
             end do
         end function
 
-        elemental function times_matrix(x, y) result(combined)
+        elemental function matrix_times(x, y) result(combined)
             type(matrix), intent(in) :: x, y
             type(matrix) :: combined
 
-            instantiate derive_extended_monoid(T, plus_t, zero_t), only: sum => mconcat
             integer :: i, j, k
             type(T) :: tmp(size(combined%elements, dim=2))
 
@@ -287,6 +287,29 @@ module matrix_example
             end do
         end function
     end template
+
+    template matrix_with_subtraction_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t)
+        require :: unit_ring_only_minus(T, plus_t, zero_t, times_t, one_t, minus_t)
+        instantiate matrix_tmpl(T, plus_t, zero_t, times_t, one_t), only: &
+            matrix => matrix, &
+            matrix_plus => matrix_plus, &
+            matrix_zero => matrix_zero, &
+            matrix_times => matrix_times, &
+            matrix_one => matrix_one
+    contains
+        elemental function matrix_minus(x, y) result(difference)
+            type(matrix), intent(in) :: x, y
+            type(matrix) :: difference
+
+            integer :: i, j
+
+            do j = 1, size(difference%elements, dim=2)
+                do i = 1, size(difference%elements, dim=1)
+                    difference%elements(i,j) = minus_t(x%elements(i,j), y%elements(i, j))
+                end do
+            end do
+        end function
+    end template
 contains
     pure function real_zero()
         real :: real_zero
@@ -299,14 +322,51 @@ contains
     end function
 
     subroutine run_it
-        instantiate matrix_tmpl( &
-                real, operator(+), real_zero, operator(*), real_one), only: &
-                matrix => matrix, matrix_one => matrix_one
-        type(matrix) :: m
+        instantiate matrix_with_subtraction_tmpl( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-)), only: &
+                matrix => matrix, &
+                matrix_zero => matrix_zero, &
+                matrix_one => matrix_one, &
+                matrix_plus => matrix_plus, &
+                matrix_times => matrix_times, &
+                matrix_minus => matrix_minus
+        type(matrix) :: m1, m2, ans
         integer :: i, j
-        m = matrix_one()
-        do i = 1, size(m%elements, dim=1)
-            print *, (m%elements(i,j), j = 1, size(m%elements, dim=2))
+        do j = 1, size(m1%elements, dim=2)
+            do i = 1, size(m1%elements, dim=1)
+                m1%elements(i,j) = (j-1)*size(m1%elements, dim=1) + i
+            end do
+        end do
+        do j = 1, size(m2%elements, dim=2)
+            do i = 1, size(m2%elements, dim=1)
+                m2%elements(i,j) = (j-1)*size(m2%elements, dim=1) + i + 25
+            end do
+        end do
+        do i = 1, size(m1%elements, dim=1)
+            print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
+        end do
+        do i = 1, size(m2%elements, dim=1)
+            print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
+        end do
+        ans = matrix_zero()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = matrix_one()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = matrix_plus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = matrix_times(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = matrix_minus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
     end subroutine
 end module
