@@ -362,15 +362,41 @@ module matrix_example
 contains
     pure function real_zero()
         real :: real_zero
+
         real_zero = 0.0
     end function
 
     pure function real_one()
         real :: real_one
+
         real_one = 1.0
     end function
 
-    subroutine run_it
+    pure function complex_zero()
+        complex :: complex_zero
+
+        complex_zero = (0., 0.)
+    end function
+
+    pure function complex_one()
+        complex :: complex_one
+
+        complex_one = (1., 0.)
+    end function
+
+    pure function integer_zero()
+        integer :: integer_zero
+
+        integer_zero = 0
+    end function
+
+    pure function integer_one()
+        integer :: integer_one
+
+        integer_one = 1
+    end function
+
+    subroutine use_real_matrix
         instantiate derive_unit_ring_from_minus( &
                 real, operator(+), real_zero, operator(*), real_one, operator(-)), only: real_negate => negate
         instantiate matrix_with_division_tmpl( &
@@ -424,6 +450,117 @@ contains
         do i = 1, size(ans%elements, dim=1)
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
+    end subroutine
+
+    subroutine use_complex_matrix
+        instantiate derive_unit_ring_from_minus( &
+                complex, operator(+), complex_zero, operator(*), complex_one, operator(-)), only: complex_negate => negate
+        instantiate matrix_with_division_tmpl( &
+                complex, operator(+), complex_zero, operator(*), complex_one, operator(-), complex_negate, operator(/)), only: &
+                complex_matrix => matrix, &
+                complex_matrix_zero => matrix_zero, &
+                complex_matrix_one => matrix_one, &
+                complex_matrix_plus => matrix_plus, &
+                complex_matrix_times => matrix_times, &
+                complex_matrix_minus => matrix_minus, &
+                complex_matrix_divide => matrix_divide
+        type(complex_matrix) :: m1, m2, ans
+        integer :: i, j
+        do j = 1, size(m1%elements, dim=2)
+            do i = 1, size(m1%elements, dim=1)
+                m1%elements(i,j) = (real(i), real(j))
+            end do
+        end do
+        do j = 1, size(m2%elements, dim=2)
+            do i = 1, size(m2%elements, dim=1)
+                m2%elements(i,j) = (real(i), real(j))
+            end do
+        end do
+        do i = 1, size(m1%elements, dim=1)
+            print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
+        end do
+        do i = 1, size(m2%elements, dim=1)
+            print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
+        end do
+        ans = complex_matrix_zero()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = complex_matrix_one()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ! ans = complex_matrix_plus(m1, m2)
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ans = complex_matrix_times(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ! ans = complex_matrix_minus(m1, m2)
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ans = complex_matrix_divide(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+    end subroutine
+
+    subroutine use_integer_matrix
+        instantiate matrix_with_subtraction_tmpl( &
+                integer, operator(+), integer_zero, operator(*), integer_one, operator(-)), only: &
+                integer_matrix => matrix, &
+                integer_matrix_zero => matrix_zero, &
+                integer_matrix_one => matrix_one, &
+                integer_matrix_plus => matrix_plus, &
+                integer_matrix_times => matrix_times, &
+                integer_matrix_minus => matrix_minus
+        type(integer_matrix) :: m1, m2, ans
+        integer :: i, j
+        ! do j = 1, size(m1%elements, dim=2)
+        !     do i = 1, size(m1%elements, dim=1)
+        !         m1%elements(i,j) = (j-1)*size(m1%elements, dim=1) + i
+        !     end do
+        ! end do
+        ! do j = 1, size(m2%elements, dim=2)
+        !     do i = 1, size(m2%elements, dim=1)
+        !         m2%elements(i,j) = (j-1)*size(m2%elements, dim=1) + i + 25
+        !     end do
+        ! end do
+        ! do i = 1, size(m1%elements, dim=1)
+        !     print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
+        ! end do
+        ! do i = 1, size(m2%elements, dim=1)
+        !     print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
+        ! end do
+        ! ans = integer_matrix_zero()
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ! ans = integer_matrix_one()
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ! ans = integer_matrix_plus(m1, m2)
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ! ans = integer_matrix_times(m1, m2)
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ! ans = integer_matrix_minus(m1, m2)
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+    end subroutine
+
+    subroutine run_it
+        call use_real_matrix
+        call use_complex_matrix
+        call use_integer_matrix
     end subroutine
 end module
 
