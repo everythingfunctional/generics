@@ -310,6 +310,55 @@ module matrix_example
             end do
         end function
     end template
+
+    template matrix_with_division_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t, negate_t, div_t)
+        require :: field_only_division(T, plus_t, zero_t, times_t, one_t, minus_t, negate_t, div_t)
+        instantiate matrix_with_subtraction_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t), only: &
+            matrix => matrix, &
+            matrix_plus => matrix_plus, &
+            matrix_zero => matrix_zero, &
+            matrix_times => matrix_times, &
+            matrix_one => matrix_one, &
+            matrix_minus => matrix_minus
+    contains
+        elemental function matrix_divide(x, y) result(quotient)
+            type(matrix), intent(in) :: x, y
+            type(matrix) :: quotient
+
+            type(matrix) :: reduced
+            integer :: i, ii, j
+            type(T) :: r
+            type(T) :: tmp(size(quotient%elements, dim=1))
+
+            reduced = x
+
+            do i = 1, size(reduced%elements, dim=1)
+                ! Assume pivot m(i,i) is not zero
+                do ii = i+1, size(reduced%elements, dim=1)
+                    r = div_t(reduced%elements(i,i), reduced%elements(ii,i))
+                    reduced%elements(ii, i) = zero_t()
+                    do j = i+1, size(reduced%elements, dim=2)
+                        reduced%elements(ii, j) = minus_t(reduced%elements(ii, j), times_t(reduced%elements(i, j), r))
+                    end do
+                end do
+            end do
+
+            quotient = y
+            do i = size(quotient%elements, dim=1), 1, -1
+                do j = 1, size(tmp)
+                    tmp(j) = zero_t()
+                end do
+                do j = i+1, size(quotient%elements, dim=1)
+                    do ii = 1, size(tmp)
+                        tmp(ii) = plus_t(tmp(ii), times_t(reduced%elements(i,j), quotient%elements(ii,j)))
+                    end do
+                end do
+                do j = 1, size(quotient%elements, dim=1)
+                    quotient%elements(j,i) = div_t(minus_t(quotient%elements(j, i), tmp(j)), reduced%elements(i,i))
+                end do
+            end do
+        end function
+    end template
 contains
     pure function real_zero()
         real :: real_zero
@@ -322,14 +371,17 @@ contains
     end function
 
     subroutine run_it
-        instantiate matrix_with_subtraction_tmpl( &
-                real, operator(+), real_zero, operator(*), real_one, operator(-)), only: &
+        instantiate derive_unit_ring_from_minus( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-)), only: real_negate => negate
+        instantiate matrix_with_division_tmpl( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-), real_negate, operator(/)), only: &
                 matrix => matrix, &
                 matrix_zero => matrix_zero, &
                 matrix_one => matrix_one, &
                 matrix_plus => matrix_plus, &
                 matrix_times => matrix_times, &
-                matrix_minus => matrix_minus
+                matrix_minus => matrix_minus, &
+                matrix_divide => matrix_divide
         type(matrix) :: m1, m2, ans
         integer :: i, j
         do j = 1, size(m1%elements, dim=2)
@@ -365,6 +417,10 @@ contains
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
         ans = matrix_minus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = matrix_divide(m1, m2)
         do i = 1, size(ans%elements, dim=1)
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
