@@ -309,6 +309,13 @@ module matrix_example
                 end do
             end do
         end function
+
+        elemental function matrix_negate(x) result(negated)
+            type(matrix), intent(in) :: x
+            type(matrix) :: negated
+
+            negated = matrix_minus(matrix_zero(), x)
+        end function
     end template
 
     template matrix_with_division_tmpl(T, plus_t, zero_t, times_t, one_t, minus_t, negate_t, div_t)
@@ -319,7 +326,8 @@ module matrix_example
             matrix_zero => matrix_zero, &
             matrix_times => matrix_times, &
             matrix_one => matrix_one, &
-            matrix_minus => matrix_minus
+            matrix_minus => matrix_minus, &
+            matrix_negate => matrix_negate
     contains
         elemental function matrix_divide(x, y) result(quotient)
             type(matrix), intent(in) :: x, y
@@ -394,6 +402,19 @@ contains
         integer :: integer_one
 
         integer_one = 1
+    end function
+
+    pure function real_inf()
+        real :: real_inf
+
+        read("inf", *) real_inf
+    end function
+
+    pure function real_min(x, y)
+        real, intent(in) :: x, y
+        real :: real_min
+
+        real_min = min(x, y)
     end function
 
     subroutine use_real_matrix
@@ -490,18 +511,18 @@ contains
         do i = 1, size(ans%elements, dim=1)
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
-        ! ans = complex_matrix_plus(m1, m2)
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
+        ans = complex_matrix_plus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
         ans = complex_matrix_times(m1, m2)
         do i = 1, size(ans%elements, dim=1)
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         end do
-        ! ans = complex_matrix_minus(m1, m2)
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
+        ans = complex_matrix_minus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
         ans = complex_matrix_divide(m1, m2)
         do i = 1, size(ans%elements, dim=1)
             print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
@@ -519,48 +540,147 @@ contains
                 integer_matrix_minus => matrix_minus
         type(integer_matrix) :: m1, m2, ans
         integer :: i, j
+        do j = 1, size(m1%elements, dim=2)
+            do i = 1, size(m1%elements, dim=1)
+                m1%elements(i,j) = (j-1)*size(m1%elements, dim=1) + i
+            end do
+        end do
+        do j = 1, size(m2%elements, dim=2)
+            do i = 1, size(m2%elements, dim=1)
+                m2%elements(i,j) = (j-1)*size(m2%elements, dim=1) + i + 25
+            end do
+        end do
+        do i = 1, size(m1%elements, dim=1)
+            print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
+        end do
+        do i = 1, size(m2%elements, dim=1)
+            print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
+        end do
+        ans = integer_matrix_zero()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = integer_matrix_one()
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = integer_matrix_plus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = integer_matrix_times(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = integer_matrix_minus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+    end subroutine
+
+    subroutine use_tropical_semiring
+        instantiate matrix_tmpl( &
+                real, real_min, real_inf, operator(+), real_zero), only: &
+                tropical_semiring => matrix, &
+                tropical_semiring_zero => matrix_zero, &
+                tropical_semiring_one => matrix_one, &
+                tropical_semiring_plus => matrix_plus, &
+                tropical_semiring_times => matrix_times
+        type(tropical_semiring) :: m1, m2, ans
+        integer :: i, j
+        do j = 1, size(m1%elements, dim=2)
+            do i = 1, size(m1%elements, dim=1)
+                m1%elements(i,j) = (j-1)*size(m1%elements, dim=1) + i
+            end do
+        end do
+        do j = 1, size(m2%elements, dim=2)
+            do i = 1, size(m2%elements, dim=1)
+                m2%elements(i,j) = (j-1)*size(m2%elements, dim=1) + i + 25
+            end do
+        end do
+        do i = 1, size(m1%elements, dim=1)
+            print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
+        end do
+        do i = 1, size(m2%elements, dim=1)
+            print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
+        end do
+        ! ans = tropical_semiring_zero()
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ! ans = tropical_semiring_one()
+        ! do i = 1, size(ans%elements, dim=1)
+        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        ! end do
+        ans = tropical_semiring_plus(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+        ans = tropical_semiring_times(m1, m2)
+        do i = 1, size(ans%elements, dim=1)
+            print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
+        end do
+    end subroutine
+
+    subroutine use_block_matrix
+        instantiate derive_unit_ring_from_minus( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-)), only: real_negate_ => negate
+        instantiate matrix_with_division_tmpl( &
+                real, operator(+), real_zero, operator(*), real_one, operator(-), real_negate_, operator(/)), only: &
+                real_matrix => matrix, &
+                real_matrix_zero => matrix_zero, &
+                real_matrix_one => matrix_one, &
+                real_matrix_plus => matrix_plus, &
+                real_matrix_times => matrix_times, &
+                real_matrix_minus => matrix_minus, &
+                real_matrix_negate => matrix_negate, &
+                real_matrix_divide => matrix_divide
+        ! instantiate matrix_with_division_tmpl( &
+        !         real_matrix, real_matrix_plus, real_matrix_zero, real_matrix_times, real_matrix_one, real_matrix_minus, real_matrix_negate, real_matrix_divide), only: &
+                ! block_matrix => matrix, &
+                ! block_matrix_zero => matrix_zero, &
+                ! block_matrix_one => matrix_one, &
+                ! block_matrix_plus => matrix_plus, &
+                ! block_matrix_times => matrix_time, &
+                ! block_matrix_minus => matrix_minus, &
+                ! block_matrix_negate => matrix_negate, &
+                ! block_matrix_divied => matrix_divide
+        ! type(block_matrix) :: m1, m2, ans
+        ! integer :: i, ii, j, jj
         ! do j = 1, size(m1%elements, dim=2)
         !     do i = 1, size(m1%elements, dim=1)
-        !         m1%elements(i,j) = (j-1)*size(m1%elements, dim=1) + i
+        !         do jj = 1, size(m1%elements(i, j)%elements, dim=2)
+        !             do ii = 1, size(m1%elements(i,j)%elements, dim=1)
+        !                 m1%elements(i,j)%elements(ii,jj) = &
+        !                         (j-1) * size(m1%elements, dim=1) * size(m1%elements(i,j)%elements) & ! whole blocks above this row
+        !                         + (jj-1) * size(m1%elements, dim=1) * size(m1%elements(i,j)%elements, dim=1) & ! rows above this row
+        !                         + (i-1) * size(m1%elements(i,j)%elements, dim=1) & ! elements to the left in other blocks
+        !                         + ii ! elements to the left in this block
+        !             end do
+        !         end do
         !     end do
         ! end do
         ! do j = 1, size(m2%elements, dim=2)
         !     do i = 1, size(m2%elements, dim=1)
-        !         m2%elements(i,j) = (j-1)*size(m2%elements, dim=1) + i + 25
+        !         do jj = 1, size(m2%elements(i, j)%elements, dim=2)
+        !             do ii = 1, size(m2%elements(i,j)%elements, dim=1)
+        !                 m2%elements(i,j)%elements(ii,jj) = &
+        !                         (j-1) * size(m2%elements, dim=1) * size(m2%elements(i,j)%elements) & ! whole blocks above this row
+        !                         + (jj-1) * size(m2%elements, dim=1) * size(m2%elements(i,j)%elements, dim=1) & ! rows above this row
+        !                         + (i-1) * size(m2%elements(i,j)%elements, dim=1) & ! elements to the left in other blocks
+        !                         + ii ! elements to the left in this block
+        !             end do
+        !         end do
         !     end do
-        ! end do
-        ! do i = 1, size(m1%elements, dim=1)
-        !     print *, (m1%elements(i,j), j = 1, size(m1%elements, dim=2))
-        ! end do
-        ! do i = 1, size(m2%elements, dim=1)
-        !     print *, (m2%elements(i,j), j = 1, size(m2%elements, dim=2))
-        ! end do
-        ! ans = integer_matrix_zero()
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
-        ! ans = integer_matrix_one()
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
-        ! ans = integer_matrix_plus(m1, m2)
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
-        ! ans = integer_matrix_times(m1, m2)
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
-        ! end do
-        ! ans = integer_matrix_minus(m1, m2)
-        ! do i = 1, size(ans%elements, dim=1)
-        !     print *, (ans%elements(i,j), j = 1, size(ans%elements, dim=2))
         ! end do
     end subroutine
 
     subroutine run_it
         call use_real_matrix
-        call use_complex_matrix
-        call use_integer_matrix
+        ! call use_complex_matrix
+        ! call use_integer_matrix
+        ! call use_tropical_semiring
+        ! call use_block_matrix
     end subroutine
 end module
 
